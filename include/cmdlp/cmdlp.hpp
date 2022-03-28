@@ -1,238 +1,89 @@
-/// @file command_line_parser.hpp
-/// @date 26/08/2021
+/// @file cmdlp.hpp
+/// @author Enrico Fraccaroli (enry.frak@gmail.com)
+/// @brief
 
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <iomanip>
+#include "line_parser.hpp"
+#include "option.hpp"
+
 #include <iostream>
+#include <iomanip>
 #include <sstream>
-#include <string>
-#include <vector>
 
 namespace cmdlp
 {
-class LineParser {
-private:
-    std::vector<std::string> tokens;
-
-public:
-    LineParser(int &argc, char **argv)
-    {
-        for (int i = 1; i < argc; ++i) {
-            tokens.emplace_back(std::string(argv[i]));
-        }
-    }
-
-    /// @brief Retrieves the given option.
-    /// @param option The option to search.
-    /// @return The value for the given option.
-    inline const std::string &getOption(const std::string &option) const
-    {
-        auto it = std::find(tokens.begin(), tokens.end(), option);
-        if ((it != tokens.end()) && (std::next(it) != tokens.end())) {
-            ++it;
-            if (!__starts_with(*it, "-")) {
-                return (*it);
-            }
-        }
-        static const std::string empty_string;
-        return empty_string;
-    }
-
-    /// @brief Retrieves the given option.
-    /// @param option The option to search.
-    /// @return The value for the given option.
-    inline const std::string &getOption(char option) const
-    {
-        static char sopt[2];
-        sopt[0] = option;
-        sopt[1] = '\0';
-        return this->getOption(sopt);
-    }
-
-    /// @brief Checks if the given option exists.
-    /// @param option The option to search.
-    /// @return If the option exists.
-    inline bool hasOption(const std::string &option) const
-    {
-        return std::find(tokens.begin(), tokens.end(), option) != tokens.end();
-    }
-
-    /// @brief Checks if the given option exists.
-    /// @param option The option to search.
-    /// @return If the option exists.
-    inline bool hasOption(char option) const
-    {
-        std::string strOption;
-        strOption.push_back('-');
-        strOption.push_back(option);
-        return this->hasOption(strOption);
-    }
-
-private:
-    /// @brief Checks if the given string s starts with the given prefix.
-    /// @param source    the source string.
-    /// @param prefix    the prefix to check.
-    /// @param sensitive turn on/off sensitivity for capits/non-capitals
-    /// @param n         specify the minimum number of characters to check.
-    /// @return true  if the source starts with the prefix, give all the conditions.
-    /// @return false if the source does not start with the prefix, give all the conditions.
-    static inline bool __starts_with(
-        const std::string &source,
-        const std::string &prefix,
-        bool sensitive = false,
-        int n          = -1)
-    {
-        if (&prefix == &source) {
-            return true;
-        }
-        if (prefix.length() > source.length()) {
-            return false;
-        }
-        if (source.empty() || prefix.empty()) {
-            return false;
-        }
-        std::string::const_iterator it0 = source.begin(), it1 = prefix.begin();
-        if (sensitive) {
-            while ((it1 != prefix.end()) && ((*it1) == (*it0))) {
-                if ((n > 0) && (--n <= 0)) {
-                    return true;
-                }
-                ++it0, ++it1;
-            }
-        } else {
-            while ((it1 != prefix.end()) && (tolower(*it1) == tolower(*it0))) {
-                if ((n > 0) && (--n <= 0)) {
-                    return true;
-                }
-                ++it0, ++it1;
-            }
-        }
-        return it1 == prefix.end();
-    }
-};
-
-class Option {
-public:
-    /// The character that identifies the option.
-    std::string optc;
-    /// The entire word for the option.
-    std::string opts;
-    /// Description of the option.
-    std::string description;
-
-    Option(const std::string &_optc,
-           const std::string &_opts,
-           const std::string &_description)
-        : optc(_optc),
-          opts(_opts),
-          description(_description)
-    {
-        // Nothing to do.
-    }
-
-    virtual ~Option() = default;
-};
-
-class ToggleOption : public Option {
-public:
-    /// If the option is toggled.
-    bool toggled;
-
-    ToggleOption(const std::string &_optc,
-                 const std::string &_opts,
-                 const std::string &_description,
-                 bool _toggled)
-        : Option(_optc, _opts, _description),
-          toggled(_toggled)
-    {
-        // Nothing to do.
-    }
-
-    virtual ~ToggleOption() = default;
-};
-
-class ValueOption : public Option {
-public:
-    /// The actual value.
-    std::string value;
-    /// The option is required.
-    bool required;
-
-    ValueOption(const std::string &_optc,
-                const std::string &_opts,
-                const std::string &_description,
-                const std::string &_value,
-                bool _required)
-        : Option(_optc, _opts, _description),
-          value(_value),
-          required(_required)
-    {
-        // Nothing to do.
-    }
-
-    virtual ~ValueOption() = default;
-};
-
 class OptionParser {
 public:
+    typedef std::vector<Option *> option_list_t;
+    typedef std::vector<Option *>::iterator iterator_t;
+    typedef std::vector<Option *>::const_iterator const_iterator_t;
+
     OptionParser(int &argc, char **argv)
         : _parser(argc, argv),
           _options(),
-          _optionParsed()
+          _optionParsed(),
+          _longest_option(),
+          _longest_value()
     {
-        _options.emplace_back(new ToggleOption("-h", "--help", "Shows this help for the program.", false));
+        _options.push_back(new ToggleOption("-h", "--help", "Shows this help for the program.", false));
     }
-
-    OptionParser(OptionParser &&other) = default;
 
     virtual ~OptionParser()
     {
-        for (auto option : _options) {
-            delete option;
+        for (iterator_t it = _options.begin(); it != _options.end(); ++it) {
+            delete *it;
         }
     }
 
-    void addOption(char optc,
-                   const std::string &opts,
-                   const std::string &_description = "",
-                   const std::string &_value       = "",
-                   bool _required                  = false)
+    inline void addOption(Option *option)
     {
-        auto __optc = this->optc_to_string(optc);
-        for (auto &it : _options) {
-            if (it->optc == __optc) {
-                std::cerr << "Duplicate option in (addOption) : " << it->optc << "[" << it->opts << "]\n";
+        for (iterator_t it = _options.begin(); it != _options.end(); ++it) {
+            if ((*it)->optc == option->optc) {
+                std::cerr << "Duplicate option : " << (*it)->optc << "[" << (*it)->opts << "]\n";
                 std::exit(1);
             }
-            if (it->opts == opts) {
-                std::cerr << "Duplicate option in (addOption) : " << it->opts << "[" << it->optc << "]\n";
+            if ((*it)->opts == option->opts) {
+                std::cerr << "Duplicate option : " << (*it)->opts << "[" << (*it)->optc << "]\n";
                 std::exit(1);
             }
         }
-        _options.emplace_back(new ValueOption(__optc, opts, _description, _value, _required));
+        _options.push_back(option);
+        if (option->opts.length() > _longest_option) {
+            _longest_option = option->opts.length();
+        }
+        if (option->get_value_length() > _longest_value) {
+            _longest_value = option->get_value_length();
+        }
     }
 
     template <typename T>
-    void addOption(char optc,
-                   const std::string &opts,
-                   const std::string &_description,
-                   const T &_value,
-                   bool _required = false)
+    void addVOption(char optc,
+                    const std::string &opts,
+                    const std::string &_description,
+                    const T &_value,
+                    bool _required)
     {
         std::stringstream ss;
         ss << _value;
-        this->addOption(optc, opts, _description, ss.str(), _required);
+        this->addOption(new ValueOption(this->optc_to_string(optc), opts, _description, ss.str(), _required));
+    }
+
+    void addTOption(char optc,
+                    const std::string &opts,
+                    const std::string &_description,
+                    bool _toggled)
+    {
+        this->addOption(new ToggleOption(this->optc_to_string(optc), opts, _description, _toggled));
     }
 
     void parseOptions()
     {
+        ValueOption *vopt;
+        ToggleOption *topt;
         std::string value;
-        for (auto option : _options) {
-            auto vopt = dynamic_cast<ValueOption *>(option);
-            if (vopt) {
+        for (iterator_t it = _options.begin(); it != _options.end(); ++it) {
+            if ((vopt = dynamic_cast<ValueOption *>(*it))) {
                 // Try to search '-*'
                 if (!(value = _parser.getOption(vopt->optc)).empty()) {
                     vopt->value = value;
@@ -247,17 +98,14 @@ public:
                     std::cerr << this->getHelp() << "\n";
                     std::exit(1);
                 }
-            } else {
-                auto topt = dynamic_cast<ToggleOption *>(option);
-                if (topt) {
-                    // Try to search '-*'
-                    if (_parser.hasOption(topt->optc)) {
-                        topt->toggled = true;
-                    }
-                    // Try to search '--***'
-                    else if (_parser.hasOption(topt->opts)) {
-                        topt->toggled = true;
-                    }
+            } else if ((topt = dynamic_cast<ToggleOption *>(*it))) {
+                // Try to search '-*'
+                if (_parser.hasOption(topt->optc)) {
+                    topt->toggled = true;
+                }
+                // Try to search '--***'
+                else if (_parser.hasOption(topt->opts)) {
+                    topt->toggled = true;
                 }
             }
         }
@@ -267,10 +115,10 @@ public:
     template <typename T>
     T getOption(const std::string &opts) const
     {
-        auto option = this->findOption(opts);
+        Option *option = this->findOption(opts);
         if (option) {
-            auto vopt = dynamic_cast<ValueOption *>(option);
-            auto topt = dynamic_cast<ToggleOption *>(option);
+            ValueOption *vopt  = dynamic_cast<ValueOption *>(option);
+            ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
             std::stringstream ss;
             if (vopt) {
                 ss << vopt->value;
@@ -287,10 +135,10 @@ public:
     template <typename T>
     T getOption(char optc) const
     {
-        auto option = this->findOption(optc);
+        Option *option = this->findOption(optc);
         if (option) {
-            auto vopt = dynamic_cast<ValueOption *>(option);
-            auto topt = dynamic_cast<ToggleOption *>(option);
+            ValueOption *vopt  = dynamic_cast<ValueOption *>(option);
+            ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
             std::stringstream ss;
             if (vopt) {
                 ss << vopt->value;
@@ -309,13 +157,13 @@ public:
     /// @return If the option exists.
     inline bool hasOption(const std::string &opts) const
     {
-        auto option = this->findOption(opts);
+        Option *option = this->findOption(opts);
         if (option) {
-            auto vopt = dynamic_cast<ValueOption *>(option);
+            ValueOption *vopt = dynamic_cast<ValueOption *>(option);
             if (vopt) {
                 return !vopt->value.empty();
             }
-            auto topt = dynamic_cast<ToggleOption *>(option);
+            ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
             if (topt) {
                 return topt->toggled;
             }
@@ -328,13 +176,13 @@ public:
     /// @return If the option exists.
     inline bool hasOption(char optc) const
     {
-        auto option = this->findOption(optc);
+        Option *option = this->findOption(optc);
         if (option) {
-            auto vopt = dynamic_cast<ValueOption *>(option);
+            ValueOption *vopt = dynamic_cast<ValueOption *>(option);
             if (vopt) {
                 return !vopt->value.empty();
             }
-            auto topt = dynamic_cast<ToggleOption *>(option);
+            ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
             if (topt) {
                 return topt->toggled;
             }
@@ -344,47 +192,22 @@ public:
 
     std::string getHelp() const
     {
-        size_t longest_option = 0, longest_value = 0;
-        for (auto option : _options) {
-            // Compute the longest option.
-            auto option_length = option->opts.size();
-            if (longest_option < option_length) {
-                longest_option = option_length;
-            }
-            // Compute the longest value.
-            auto vopt = dynamic_cast<ValueOption *>(option);
-            if (vopt) {
-                auto value_length = vopt->value.length();
-                if (longest_value < value_length) {
-                    longest_value = value_length;
-                }
-            } else {
-                auto topt = dynamic_cast<ToggleOption *>(option);
-                if (topt) {
-                    if (longest_value < 4) {
-                        longest_value = 4;
-                    }
-                }
-            }
-        }
+        ValueOption *vopt;
+        ToggleOption *topt;
         // Print the arguments.
         std::stringstream ss;
-        for (auto option : _options) {
+        for (const_iterator_t it = _options.begin(); it != _options.end(); ++it) {
             ss << "    ";
-            ss << "[" << option->optc << "] ";
-            ss << std::setw(longest_option) << std::left << option->opts;
-            ss << " (" << std::setw(longest_value) << std::right;
-            auto vopt = dynamic_cast<ValueOption *>(option);
-            if (vopt) {
+            ss << "[" << (*it)->optc << "] ";
+            ss << std::setw(_longest_option) << std::left << (*it)->opts;
+            ss << " (" << std::setw(_longest_value) << std::right;
+            if ((vopt = dynamic_cast<ValueOption *>(*it))) {
                 ss << vopt->value;
-            } else {
-                auto topt = dynamic_cast<ToggleOption *>(option);
-                if (topt) {
-                    ss << (topt->toggled ? "true" : "false");
-                }
+            } else if ((topt = dynamic_cast<ToggleOption *>(*it))) {
+                ss << (topt->toggled ? "true" : "false");
             }
             ss << ") : ";
-            ss << option->description << "\n";
+            ss << (*it)->description << "\n";
         }
         return ss.str();
     }
@@ -399,41 +222,49 @@ private:
 
     Option *findOption(char optc) const
     {
-        assert(_optionParsed && "You must parse the options first.");
-        auto __optc = this->optc_to_string(optc);
-        for (auto option : _options) {
-            if (option->optc == __optc) {
-                return option;
+        if (!_optionParsed) {
+            std::cerr << "You must parse the options first.\n";
+            std::exit(1);
+        }
+        std::string __optc = this->optc_to_string(optc);
+        for (const_iterator_t it = _options.begin(); it != _options.end(); ++it) {
+            if ((*it)->optc == __optc) {
+                return (*it);
             }
         }
-        return nullptr;
+        return NULL;
     }
 
     Option *findOption(const std::string &opts) const
     {
-        assert(_optionParsed && "You must parse the options first.");
-        for (auto option : _options) {
-            if (option->opts == opts) {
-                return option;
+        if (!_optionParsed) {
+            std::cerr << "You must parse the options first.\n";
+            std::exit(1);
+        }
+        for (const_iterator_t it = _options.begin(); it != _options.end(); ++it) {
+            if ((*it)->opts == opts) {
+                return (*it);
             }
         }
-        return nullptr;
+        return NULL;
     }
 
     LineParser _parser;
-    std::vector<Option *> _options;
+    option_list_t _options;
     bool _optionParsed;
+    unsigned _longest_option;
+    unsigned _longest_value;
 };
 
 template <>
 std::string OptionParser::getOption(const std::string &opts) const
 {
-    auto option = this->findOption(opts);
+    Option *option = this->findOption(opts);
     if (option) {
-        auto vopt = dynamic_cast<ValueOption *>(option);
+        ValueOption *vopt = dynamic_cast<ValueOption *>(option);
         if (vopt)
             return vopt->value;
-        auto topt = dynamic_cast<ToggleOption *>(option);
+        ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
         if (topt)
             return topt->toggled ? "true" : "false";
     }
@@ -443,12 +274,12 @@ std::string OptionParser::getOption(const std::string &opts) const
 template <>
 std::string OptionParser::getOption(char optc) const
 {
-    auto option = this->findOption(optc);
+    Option *option = this->findOption(optc);
     if (option) {
-        auto vopt = dynamic_cast<ValueOption *>(option);
+        ValueOption *vopt = dynamic_cast<ValueOption *>(option);
         if (vopt)
             return vopt->value;
-        auto topt = dynamic_cast<ToggleOption *>(option);
+        ToggleOption *topt = dynamic_cast<ToggleOption *>(option);
         if (topt)
             return topt->toggled ? "true" : "false";
     }
