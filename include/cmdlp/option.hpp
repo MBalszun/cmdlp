@@ -18,12 +18,12 @@ public:
     /// Description of the option.
     std::string description;
 
-    Option(const std::string &_optc,
-           const std::string &_opts,
-           const std::string &_description)
-        : optc(_optc),
-          opts(_opts),
-          description(_description)
+    Option(std::string _optc,
+           std::string _opts,
+           std::string _description)
+        : optc(std::move(_optc)),
+          opts(std::move(_opts)),
+          description(std::move(_description))
     {
         // Nothing to do.
     }
@@ -41,10 +41,10 @@ public:
     /// If the option is toggled.
     bool toggled;
 
-    ToggleOption(const std::string &_optc,
-                 const std::string &_opts,
-                 const std::string &_description,
-                 bool _toggled)
+    ToggleOption(std::string _optc,
+                 std::string _opts,
+                 std::string _description,
+                 bool _toggled = false)
         : Option(_optc, _opts, _description),
           toggled(_toggled)
     {
@@ -69,13 +69,13 @@ public:
     /// The option is required.
     bool required;
 
-    ValueOption(const std::string &_optc,
-                const std::string &_opts,
-                const std::string &_description,
-                const std::string &_value,
-                bool _required)
+    ValueOption(std::string _optc,
+                std::string _opts,
+                std::string _description,
+                std::string _value,
+                bool _required = false)
         : Option(_optc, _opts, _description),
-          value(_value),
+          value(std::move(_value)),
           required(_required)
     {
         // Nothing to do.
@@ -91,5 +91,12 @@ public:
         return value.size();
     }
 };
+
+static inline std::string &optc_to_string(char c)
+{
+    static std::string optcs = "-*";
+    optcs[1]                 = c;
+    return optcs;
+}
 
 } // namespace cmdlp

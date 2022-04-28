@@ -18,7 +18,7 @@ private:
     token_list_t tokens;
 
 public:
-    LineParser(int &argc, char **argv)
+    LineParser(int argc, char **argv)
     {
         for (int i = 1; i < argc; ++i) {
             tokens.push_back(std::string(argv[i]));
