@@ -45,6 +45,26 @@ public:
     {
     }
 
+    OptionList(const OptionList &other)
+        : options(),
+          longest_option(other.longest_option),
+          longest_value(other.longest_value)
+    {
+        for (const_iterator_t it = other.options.begin(); it != other.options.end(); ++it) {
+            // First try to check if it is a value option.
+            const ValueOption *vopt = dynamic_cast<const ValueOption *>(*it);
+            if (vopt) {
+                options.emplace_back(new ValueOption(*vopt));
+            } else {
+                // Then, check if it is a toggle option.
+                const ToggleOption *topt = dynamic_cast<const ToggleOption *>(*it);
+                if (topt) {
+                    options.emplace_back(new ToggleOption(*topt));
+                }
+            }
+        }
+    }
+
     virtual ~OptionList()
     {
         for (iterator_t it = options.begin(); it != options.end(); ++it)

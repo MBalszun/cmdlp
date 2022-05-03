@@ -1,5 +1,15 @@
 #include "cmdlp/cmdlp.hpp"
 
+void test_copy(cmdlp::OptionParser parser)
+{
+    std::cout << "Usage :\n"
+              << parser.getHelp() << "\n";
+    std::cout << "-d : " << parser.getOption<double>('d') << "\n";
+    std::cout << "-i : " << parser.getOption<int>('i') << "\n";
+    std::cout << "-s : " << parser.getOption<std::string>('s') << "\n";
+    std::cout << "-v : " << parser.getOption<bool>('v') << "\n";
+}
+
 int main(int argc, char *argv[])
 {
     std::vector<char *> __argv;
@@ -23,11 +33,8 @@ int main(int argc, char *argv[])
     parser.addOption('s', "--string", "A string.. actually, a single word", "hello");
     parser.addToggle('v', "--verbose", "Enables verbose output");
     parser.parseOptions();
-    std::cout << "Usage :\n"
-              << parser.getHelp() << "\n";
-    std::cout << "-d : " << parser.getOption<double>('d') << "\n";
-    std::cout << "-i : " << parser.getOption<int>('i') << "\n";
-    std::cout << "-s : " << parser.getOption<std::string>('s') << "\n";
-    std::cout << "-v : " << parser.getOption<bool>('v') << "\n";
+
+    test_copy(parser);
+    
     return 0;
 }
