@@ -8,6 +8,7 @@
 
 #include <exception>
 #include <sstream>
+#include <utility>
 
 namespace cmdlp
 {
@@ -16,12 +17,12 @@ private:
     std::string msg;
 
 public:
-    OptionExistException(Option *_new_option, Option *_existing_option)
+    OptionExistException(const Option &_new_option, const Option &_existing_option)
         : std::exception()
     {
         std::stringstream ss;
-        ss << "Option (" << _new_option->optc << ", " << _new_option->opts << ") already exists: "
-           << "(" << _existing_option->optc << ", " << _existing_option->opts << ")\n";
+        ss << "Option (" << _new_option.optc << ", " << _new_option.opts << ") already exists: "
+           << "(" << _existing_option.optc << ", " << _existing_option.opts << ")\n";
         msg = ss.str();
     }
 
@@ -33,9 +34,9 @@ public:
 
 class OptionList {
 public:
-    typedef std::vector<Option *> option_list_t;
-    typedef std::vector<Option *>::iterator iterator_t;
-    typedef std::vector<Option *>::const_iterator const_iterator_t;
+    typedef std::vector<std::unique_ptr<Option>> option_list_t;
+    typedef std::vector<std::unique_ptr<Option>>::iterator iterator_t;
+    typedef std::vector<std::unique_ptr<Option>>::const_iterator const_iterator_t;
 
     /// @brief Construct a new Option List object.
     OptionList()
@@ -50,26 +51,33 @@ public:
           longest_option(other.longest_option),
           longest_value(other.longest_value)
     {
-        for (const_iterator_t it = other.options.begin(); it != other.options.end(); ++it) {
-            // First try to check if it is a value option.
-            const ValueOption *vopt = dynamic_cast<const ValueOption *>(*it);
-            if (vopt) {
-                options.emplace_back(new ValueOption(*vopt));
-            } else {
-                // Then, check if it is a toggle option.
-                const ToggleOption *topt = dynamic_cast<const ToggleOption *>(*it);
-                if (topt) {
-                    options.emplace_back(new ToggleOption(*topt));
-                }
-            }
+        for (const auto &option : other.options) {
+            this->options.push_back(option->clone());
         }
     }
 
-    virtual ~OptionList()
+    OptionList(OptionList &&other) noexcept
+        : options{ std::move(other.options) },
+          longest_option{ std::exchange(other.longest_option, 0) },
+          longest_value{ std::exchange(other.longest_value, 0) }
     {
-        for (iterator_t it = options.begin(); it != options.end(); ++it)
-            delete *it;
     }
+
+    // both move and copy assignment
+    OptionList &operator=(OptionList other)
+    {
+        this->swap(other);
+        return *this;
+    }
+
+    void swap(OptionList &other)
+    {
+        std::swap(this->options, other.options);
+        std::swap(this->longest_option, other.longest_option);
+        std::swap(this->longest_value, other.longest_value);
+    }
+
+    virtual ~OptionList() = default;
 
     inline bool optionExhists(Option *option) const
     {
@@ -114,19 +122,19 @@ public:
         return this->getOption<T>("", opts);
     }
 
-    inline void addOption(Option *option)
+    inline void addOption(std::unique_ptr<Option> option)
     {
-        for (iterator_t it = options.begin(); it != options.end(); ++it) {
-            if ((*it)->optc == option->optc)
-                throw OptionExistException(option, *it);
-            if ((*it)->opts == option->opts)
-                throw OptionExistException(option, *it);
+        for (const auto &opt_ptr : options) {
+            if (opt_ptr->optc == option->optc)
+                throw OptionExistException(*option, *opt_ptr);
+            if (opt_ptr->opts == option->opts)
+                throw OptionExistException(*option, *opt_ptr);
         }
-        options.push_back(option);
         if (option->opts.length() > longest_option)
             longest_option = option->opts.length();
         if (option->get_value_length() > longest_value)
             longest_value = option->get_value_length();
+        options.push_back(std::move(option));
     }
 
     inline const_iterator_t begin() const
@@ -158,24 +166,18 @@ public:
 private:
     inline bool optionExhists(const std::string &optc, const std::string &opts) const
     {
-        for (const_iterator_t it = options.begin(); it != options.end(); ++it) {
-            if (!optc.empty() && ((*it)->optc == optc))
-                return true;
-            if (!opts.empty() && ((*it)->opts == opts))
-                return true;
-        }
-        return false;
+        return findOption(optc, opts) != nullptr;
     }
 
     Option *findOption(const std::string &optc, const std::string &opts) const
     {
-        for (const_iterator_t it = options.begin(); it != options.end(); ++it) {
-            if (!optc.empty() && ((*it)->optc == optc))
-                return *it;
-            if (!opts.empty() && ((*it)->opts == opts))
-                return *it;
+        for (const auto &o : options) {
+            if (!optc.empty() && o->optc == optc)
+                return o.get();
+            if (!opts.empty() && o->opts == opts)
+                return o.get();
         }
-        return NULL;
+        return nullptr;
     }
 
     template <typename T>

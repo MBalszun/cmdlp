@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 namespace cmdlp
 {
@@ -28,12 +29,15 @@ public:
         // Nothing to do.
     }
 
-    virtual std::size_t get_value_length() const = 0;
+    virtual std::size_t get_value_length() const  = 0;
+    virtual std::unique_ptr<Option> clone() const = 0;
+    virtual ~Option()                 = default;
 
-    virtual ~Option()
-    {
-        // Nothing to do.
-    }
+protected:
+    Option(const Option &other) = default;
+    Option(Option &&other)      = default;
+    Option &operator=(const Option &other) = default;
+    Option &operator=(Option &&other) = default;
 };
 
 class ToggleOption : public Option {
@@ -51,14 +55,13 @@ public:
         // Nothing to do.
     }
 
-    virtual ~ToggleOption()
-    {
-        // Nothing to do.
-    }
-
-    virtual std::size_t get_value_length() const
+    std::size_t get_value_length() const override
     {
         return 5;
+    }
+    std::unique_ptr<Option> clone() const override
+    {
+        return std::make_unique<ToggleOption>(*this);
     }
 };
 
@@ -81,14 +84,13 @@ public:
         // Nothing to do.
     }
 
-    virtual ~ValueOption()
-    {
-        // Nothing to do.
-    }
-
     virtual std::size_t get_value_length() const
     {
         return value.size();
+    }
+    std::unique_ptr<Option> clone() const override
+    {
+        return std::make_unique<ValueOption>(*this);
     }
 };
 
