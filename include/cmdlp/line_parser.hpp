@@ -32,7 +32,7 @@ public:
     {
         token_list_t::const_iterator it = std::find(tokens.begin(), tokens.end(), option);
         if ((it != tokens.end()) && (++it != tokens.end())) {
-            if (!__starts_with(*it, "-")) {
+            if (!_starts_with(*it, "-")) {
                 return (*it);
             }
         }
@@ -78,7 +78,7 @@ private:
     /// @param n         specify the minimum number of characters to check.
     /// @return true  if the source starts with the prefix, give all the conditions.
     /// @return false if the source does not start with the prefix, give all the conditions.
-    static inline bool __starts_with(
+    static inline bool _starts_with(
         const std::string &source,
         const std::string &prefix,
         bool sensitive = false,

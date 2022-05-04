@@ -33,12 +33,12 @@ if(NOT hasParent)
     # flag (Visual C++ 2017 and later).
     if(MSVC)
         add_compile_options(/permissive-)
-    endif()
-    
+    else()
     # Add debugging options.
-    add_compile_options($<$<CONFIG:Debug>:-g3>)
-    add_compile_options($<$<CONFIG:Debug>:-ggdb>)
-    add_compile_options($<$<CONFIG:Debug>:-O0>)
+        add_compile_options($<$<CONFIG:Debug>:-g3>)
+        add_compile_options($<$<CONFIG:Debug>:-ggdb>)
+        add_compile_options($<$<CONFIG:Debug>:-O0>)
+    endif()
 
     # Set Warning flags
     if(MSVC)

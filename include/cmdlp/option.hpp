@@ -28,7 +28,7 @@ public:
         // Nothing to do.
     }
 
-    virtual unsigned get_value_length() const = 0;
+    virtual std::size_t get_value_length() const = 0;
 
     virtual ~Option()
     {
@@ -56,7 +56,7 @@ public:
         // Nothing to do.
     }
 
-    virtual unsigned get_value_length() const
+    virtual std::size_t get_value_length() const
     {
         return 5;
     }
@@ -86,7 +86,7 @@ public:
         // Nothing to do.
     }
 
-    virtual unsigned get_value_length() const
+    virtual std::size_t get_value_length() const
     {
         return value.size();
     }
