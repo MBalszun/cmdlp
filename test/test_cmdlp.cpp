@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 
      dummy_argv.push_back((char *)"--verbose");
 
-    cmdlp::OptionParser parser(dummy_argv.size() - 1, dummy_argv.data());
+    cmdlp::OptionParser parser(static_cast<int>(dummy_argv.size() - 1), dummy_argv.data());
     parser.addOption('d', "--double", "Double value", 0.2);
     parser.addOption('i', "--int", "An integer value", 1);
     parser.addOption('s', "--string", "A string.. actually, a single word", "hello");

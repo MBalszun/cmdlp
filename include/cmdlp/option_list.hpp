@@ -139,17 +139,17 @@ public:
         return options.end();
     }
 
-    inline unsigned getLongestOption() const
+    inline std::size_t getLongestOption() const
     {
         return longest_option;
     }
 
-    inline unsigned getLongestValue() const
+    inline std::size_t getLongestValue() const
     {
         return longest_value;
     }
 
-    inline void updateLongestValue(unsigned length)
+    inline void updateLongestValue(std::size_t length)
     {
         if (length > longest_value)
             longest_value = length;
@@ -205,8 +205,8 @@ private:
     }
 
     option_list_t options;
-    unsigned longest_option;
-    unsigned longest_value;
+    std::size_t longest_option;
+    std::size_t longest_value;
 };
 
 template <>
